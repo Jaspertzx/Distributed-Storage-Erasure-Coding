@@ -24,10 +24,10 @@ The Reed-Solomon algorithm works by:
 1. Calculate the encoding matrix 
    1. First, find the Vandermonde Matrix (matrix[r][c] = pow(r, c)) of size 6, 4
    2. Second, get the inverse upper part of matrix of size 4 x 4
-   3. Third, multiply the Vandermonde matrix with the inver upper part to get a encoding matrix of size 6, 4
+   3. Third, multiply the Vandermonde matrix with the inner upper part to get a encoding matrix of size 6, 4
 ```
-Vandermonde     inverse upper   encoding
-matrix          part of matrix  matrix
+Vandermonde     Inverse upper   Encoding
+matrix          matrix          matrix
 
 01 00 00 00                     01 00 00 00
 01 01 01 01     01 00 00 00     00 01 00 00
