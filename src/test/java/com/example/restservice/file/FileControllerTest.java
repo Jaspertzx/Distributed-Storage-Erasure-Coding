@@ -41,6 +41,9 @@ class FileControllerTest {
     private UserRepository userRepository;
 
     @Mock
+    private FileRepository fileRepository;
+
+    @Mock
     private ShardUploader shardUploader;
 
     @Mock
@@ -81,7 +84,11 @@ class FileControllerTest {
         when(shardUploader.getAccessToken()).thenReturn("accessToken");
         doNothing().when(shardUploader).uploadFileToDrive(anyString(), any(File.class), anyInt());
         when(shardHandler.encodeFile(any())).thenReturn(new File[]{mockFile});
+        List<FileInfo> arrFileInfo = new ArrayList<>();
+        when(fileRepository.findByUserIdAndOriginalFilename(anyLong(), anyString())).thenReturn(arrFileInfo);
         ResponseEntity<?> responseEntity = fileController.uploadFile(multipartFile, authHeader);
+
+        System.out.println(responseEntity.getBody());
 
         assertEquals(HttpStatusCode.valueOf(200), responseEntity.getStatusCode());
         assertNotNull(responseEntity.getBody());

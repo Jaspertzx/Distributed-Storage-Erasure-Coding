@@ -25,9 +25,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @Component
 public class GoogleDriveShardRetriever implements ShardRetriever {
@@ -109,36 +114,50 @@ public class GoogleDriveShardRetriever implements ShardRetriever {
         Drive driveService = getDriveService(accessToken);
 
         List<byte[]> downloadedFiles = new ArrayList<>();
+        ExecutorService executor = Executors.newFixedThreadPool(6); // Pool of 6 threads
+        List<Future<byte[]>> futures = new ArrayList<>();
 
         for (FileInfo fileInfo : fileInfos) {
-            int shardIndex = fileInfo.getShardIndex();
-            String fileName = fileInfo.getFileName();
-            Long userId = fileInfo.getUserId();
+            futures.add(executor.submit(() -> downloadFile(fileInfo, accessToken, driveService)));
+        }
 
-            String fileId = getFileIdByName(accessToken, fileName, shardIndex);
-
-            if (fileId == null) {
+        for (Future<byte[]> future : futures) {
+            try {
+                downloadedFiles.add(future.get());
+            } catch (Exception e) {
                 downloadedFiles.add(null);
-            } else {
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                HttpResponse fileResponse = driveService.files().get(fileId).executeMedia();
-                fileResponse.download(outputStream);
-
-                MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                byte[] downloadedHashBytes = digest.digest(outputStream.toByteArray());
-                String downloadedHash = HexFormat.of().formatHex(downloadedHashBytes);
-
-                if (!downloadedHash.equals(fileInfo.getFileSha256())) {
-                    downloadedFiles.add(null);
-                    continue;
-                }
-                downloadedFiles.add(outputStream.toByteArray());
-
-                outputStream.close();
             }
         }
 
+        executor.shutdown();
         return downloadedFiles;
+    }
+
+    private byte[] downloadFile(FileInfo fileInfo, String accessToken, Drive driveService) throws Exception {
+        String fileId = getFileIdByName(accessToken, fileInfo.getFileName(), fileInfo.getShardIndex());
+
+        if (fileId == null) {
+            return null;
+        }
+
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            HttpResponse fileResponse = driveService.files().get(fileId).executeMedia();
+            fileResponse.download(outputStream);
+
+            byte[] downloadedBytes = outputStream.toByteArray();
+            if (!isFileHashValid(downloadedBytes, fileInfo.getFileSha256())) {
+                return null;
+            }
+
+            return downloadedBytes;
+        }
+    }
+
+    private boolean isFileHashValid(byte[] fileData, String expectedHash) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] fileHashBytes = digest.digest(fileData);
+        String fileHash = HexFormat.of().formatHex(fileHashBytes);
+        return fileHash.equals(expectedHash);
     }
 
     /**
@@ -173,3 +192,43 @@ public class GoogleDriveShardRetriever implements ShardRetriever {
         return files.get(0).getId();
     }
 }
+
+
+/*
+*     public List<byte[]> downloadFilesFromDrive(List<FileInfo> fileInfos) throws Exception {
+        String accessToken = getAccessToken();
+        Drive driveService = getDriveService(accessToken);
+
+        List<byte[]> downloadedFiles = new ArrayList<>();
+
+        for (FileInfo fileInfo : fileInfos) {
+            int shardIndex = fileInfo.getShardIndex();
+            String fileName = fileInfo.getFileName();
+            Long userId = fileInfo.getUserId();
+
+            String fileId = getFileIdByName(accessToken, fileName, shardIndex);
+
+            if (fileId == null) {
+                downloadedFiles.add(null);
+            } else {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                HttpResponse fileResponse = driveService.files().get(fileId).executeMedia();
+                fileResponse.download(outputStream);
+
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] downloadedHashBytes = digest.digest(outputStream.toByteArray());
+                String downloadedHash = HexFormat.of().formatHex(downloadedHashBytes);
+
+                if (!downloadedHash.equals(fileInfo.getFileSha256())) {
+                    downloadedFiles.add(null);
+                    continue;
+                }
+                downloadedFiles.add(outputStream.toByteArray());
+
+                outputStream.close();
+            }
+        }
+
+        return downloadedFiles;
+    }
+* */

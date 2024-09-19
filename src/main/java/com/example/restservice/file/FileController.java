@@ -34,8 +34,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @RestController
 @RequestMapping("/file")
@@ -67,37 +71,33 @@ public class FileController {
      * @param file The file to be uploaded, received as a MultipartFile.
      * @param authHeader The Authorization header containing the JWT token.
      * @return A ResponseEntity indicating success or failure of the file upload.
-     * @throws Exception if there is an error during file upload or sharding.
      */
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
-                                        @RequestHeader("Authorization") String authHeader) throws Exception {
-        FileInfo fileInfo = new FileInfo();
-        String originalFilename = file.getOriginalFilename();
-        User user = getUserFromAuthorization(authHeader);
+                                        @RequestHeader("Authorization") String authHeader) {
+        try {
+            User user = getUserFromAuthorization(authHeader);
+            String originalFilename = file.getOriginalFilename();
 
-        if (!fileRepository.findByUserIdAndOriginalFilename(user.getId(), originalFilename).isEmpty()) {
-            return ResponseEntity.badRequest().body("File already exists");
-        }
-
-        String accessToken = shardUploader.getAccessToken();
-
-        File convertedFile = convertMultipartFileToFile(file);
-        long originalFileSize = convertedFile.length();
-
-        File[] shardedFiles = shardHandler.encodeFile(convertedFile);
-
-        for (int index = 0; index < shardedFiles.length; index++) {
-            try {
-                fileInfo = new FileInfo(shardedFiles[index], user.getId(), index, originalFilename, originalFileSize);
-                fileService.saveFileInfo(fileInfo);
-            } catch (RuntimeException e) {
-                return ResponseEntity.internalServerError().body(e.getMessage());
+            if (fileExistsForUser(user.getId(), originalFilename)) {
+                return ResponseEntity.badRequest().body("File already exists");
             }
-            shardUploader.uploadFileToDrive(accessToken, shardedFiles[index], index);
-        }
 
-        return ResponseEntity.ok("File successfully encoded and stored");
+            File convertedFile = convertMultipartFileToFile(file);
+            long originalFileSize = convertedFile.length();
+            File[] shardedFiles = shardHandler.encodeFile(convertedFile);
+
+            String accessToken = shardUploader.getAccessToken();
+            ExecutorService executorService = Executors.newFixedThreadPool(6);
+            List<Future<Void>> futures = uploadShards(shardedFiles, accessToken, user, originalFilename, originalFileSize, executorService);
+
+            waitForCompletion(futures);
+            executorService.shutdown();
+
+            return ResponseEntity.ok("File successfully encoded and stored");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
     }
 
     /**
@@ -166,4 +166,69 @@ public class FileController {
         }
         return convertedFile;
     }
+
+    private boolean fileExistsForUser(Long userId, String originalFilename) {
+        return !fileRepository.findByUserIdAndOriginalFilename(userId, originalFilename).isEmpty();
+    }
+
+    private List<Future<Void>> uploadShards(File[] shardedFiles, String accessToken, User user,
+                                            String originalFilename, long originalFileSize, ExecutorService executorService) {
+        List<Future<Void>> futures = new ArrayList<>();
+        for (int index = 0; index < shardedFiles.length; index++) {
+            final int shardIndex = index;
+            futures.add(executorService.submit(() -> uploadShard(shardedFiles[shardIndex], shardIndex, accessToken, user, originalFilename, originalFileSize)));
+        }
+        return futures;
+    }
+
+    private Void uploadShard(File shardFile, int shardIndex, String accessToken, User user,
+                             String originalFilename, long originalFileSize) throws Exception {
+        try {
+            FileInfo shardFileInfo = new FileInfo(shardFile, user.getId(), shardIndex, originalFilename, originalFileSize);
+            fileService.saveFileInfo(shardFileInfo);
+            shardUploader.uploadFileToDrive(accessToken, shardFile, shardIndex);
+        } catch (RuntimeException e) {
+            throw new Exception("Error uploading shard " + shardIndex + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    private void waitForCompletion(List<Future<Void>> futures) throws Exception {
+        for (Future<Void> future : futures) {
+            future.get();
+        }
+    }
 }
+
+/*
+*     @PostMapping("/upload")
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
+                                        @RequestHeader("Authorization") String authHeader) throws Exception {
+        FileInfo fileInfo = new FileInfo();
+        String originalFilename = file.getOriginalFilename();
+        User user = getUserFromAuthorization(authHeader);
+
+        if (!fileRepository.findByUserIdAndOriginalFilename(user.getId(), originalFilename).isEmpty()) {
+            return ResponseEntity.badRequest().body("File already exists");
+        }
+
+        String accessToken = shardUploader.getAccessToken();
+
+        File convertedFile = convertMultipartFileToFile(file);
+        long originalFileSize = convertedFile.length();
+
+        File[] shardedFiles = shardHandler.encodeFile(convertedFile);
+
+        for (int index = 0; index < shardedFiles.length; index++) {
+            try {
+                fileInfo = new FileInfo(shardedFiles[index], user.getId(), index, originalFilename, originalFileSize);
+                fileService.saveFileInfo(fileInfo);
+            } catch (RuntimeException e) {
+                return ResponseEntity.internalServerError().body(e.getMessage());
+            }
+            shardUploader.uploadFileToDrive(accessToken, shardedFiles[index], index);
+        }
+
+        return ResponseEntity.ok("File successfully encoded and stored");
+    }
+* */
