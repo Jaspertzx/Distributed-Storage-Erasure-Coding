@@ -1,5 +1,6 @@
-package com.example.restservice.shardhandler;
+package com.example.restservice.unit.shardhandler;
 
+import com.example.restservice.shardhandler.ReedSolomonShardHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

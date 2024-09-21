@@ -1,5 +1,8 @@
-package com.example.restservice.user;
+package com.example.restservice.unit.user;
 
+import com.example.restservice.user.User;
+import com.example.restservice.user.UserDetailsServiceHandler;
+import com.example.restservice.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
