@@ -29,12 +29,6 @@ class UserControllerIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
-
     @BeforeEach
     public void setUp() {
         User testUser = new User();
@@ -45,7 +39,6 @@ class UserControllerIntegrationTest {
 
     @Test
     void testRegisterUser_Success() throws Exception {
-        // Test the register endpoint with valid data
         mockMvc.perform(post("/auth/register")
                         .param("username", "newUser")
                         .param("password", "newPassword")
@@ -56,7 +49,6 @@ class UserControllerIntegrationTest {
 
     @Test
     void testRegisterUser_Failure() throws Exception {
-        // Test the register endpoint with a user that already exists
         mockMvc.perform(post("/auth/register")
                         .param("username", "testUser")
                         .param("password", "password")
@@ -67,7 +59,6 @@ class UserControllerIntegrationTest {
 
     @Test
     void testLoginUser_Success() throws Exception {
-        // Test the login endpoint with valid credentials
         MvcResult result = mockMvc.perform(post("/auth/login")
                         .param("username", "testUser")
                         .param("password", "password")
@@ -82,7 +73,6 @@ class UserControllerIntegrationTest {
 
     @Test
     void testLoginUser_InvalidCredentials() throws Exception {
-        // Test the login endpoint with invalid credentials
         mockMvc.perform(post("/auth/login")
                         .param("username", "testUser")
                         .param("password", "wrongPassword")
