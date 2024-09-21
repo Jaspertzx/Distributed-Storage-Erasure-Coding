@@ -1,5 +1,9 @@
-package com.example.restservice.file;
+package com.example.restservice.integration.file;
 
+import com.example.restservice.file.FileController;
+import com.example.restservice.file.FileInfo;
+import com.example.restservice.file.FileRepository;
+import com.example.restservice.file.FileService;
 import com.example.restservice.security.JwtTokenProvider;
 import com.example.restservice.shardhandler.ShardHandler;
 import com.example.restservice.shardretriever.ShardRetriever;

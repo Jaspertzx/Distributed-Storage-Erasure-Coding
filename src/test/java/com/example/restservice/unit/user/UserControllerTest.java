@@ -1,4 +1,5 @@
-package com.example.restservice.user;
+package com.example.restservice.unit.user;
+import com.example.restservice.user.User;
 import com.example.restservice.user.UserController;
 import com.example.restservice.user.UserService;
 import com.example.restservice.security.JwtTokenProvider;

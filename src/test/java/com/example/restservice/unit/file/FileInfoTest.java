@@ -1,5 +1,6 @@
-package com.example.restservice.file;
+package com.example.restservice.unit.file;
 
+import com.example.restservice.file.FileInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
