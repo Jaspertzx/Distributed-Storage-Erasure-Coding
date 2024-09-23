@@ -46,11 +46,13 @@ public class FileInfo {
     @Column(name = "original_file_size", nullable = false)
     private long orginalFileSize;
 
-    // Default constructor
+    private int shardsRetrievable;
+
+    private int shardsOriginalCount;
+
     public FileInfo() {
     }
 
-    // Constructor with File parameter
     public FileInfo(File file, Long userId, Integer shard_index, String originalFilename, long orginalFileSize) throws Exception {
         this.userId = userId;
         this.fileName = file.getName();
@@ -62,7 +64,6 @@ public class FileInfo {
         this.orginalFileSize = orginalFileSize;
     }
 
-    // Method to calculate SHA-256 hash of the file
     private String calculateSha256(File file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] fileBytes = Files.readAllBytes(file.toPath());
@@ -70,21 +71,12 @@ public class FileInfo {
         return HexFormat.of().formatHex(hash);
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public Long getUserId() {
         return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
     }
 
     public String getFileName() {
@@ -107,10 +99,6 @@ public class FileInfo {
         return fileSha256;
     }
 
-    public void setFileSha256(String fileSha256) {
-        this.fileSha256 = fileSha256;
-    }
-
     public Integer getByteSize() {
         return byteSize;
     }
@@ -131,8 +119,25 @@ public class FileInfo {
         return orginalFileSize;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public int getShardsRetrievable() {
+        return shardsRetrievable;
+    }
+
+    public void setShardsRetrievable(int shardsRetrievable) {
+        this.shardsRetrievable = shardsRetrievable;
+    }
+
+    public void setShardsOriginalCount(int shardsOriginalCount) {
+        this.shardsOriginalCount = shardsOriginalCount;
+    }
+    public int getShardsOriginalCount() {
+        return shardsOriginalCount;
+    }
+
+    public void setOriginalFilename(String filename) {
+    }
+
+    public void setOrginalFileSize(int i) {
     }
 
     @Override
@@ -146,11 +151,5 @@ public class FileInfo {
                 ", byteSize=" + byteSize +
                 ", createdAt=" + createdAt +
                 '}';
-    }
-
-    public void setOriginalFilename(String filename) {
-    }
-
-    public void setOrginalFileSize(int i) {
     }
 }

@@ -36,7 +36,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class FileControllerTest {
+class FileControllerIntegrationTest {
 
     @Mock
     private FileService fileService;
@@ -119,7 +119,7 @@ class FileControllerTest {
         }
 
         when(fileService.getFileShards(any(), any())).thenReturn(list);
-        when(shardRetriever.downloadFilesFromDrive(anyList())).thenReturn(List.of("test content".getBytes()));
+        when(shardRetriever.downloadFiles(anyList())).thenReturn(List.of("test content".getBytes()));
         when(jwtTokenProvider.getUsernameFromJWT(anyString())).thenReturn("user");
         when(userRepository.findByUsername(anyString())).thenReturn(mockUser);
         when(shardHandler.decodeFile(any(), any(), anyLong())).thenReturn(inputFile);

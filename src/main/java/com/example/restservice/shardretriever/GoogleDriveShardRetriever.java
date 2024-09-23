@@ -29,7 +29,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -109,7 +108,8 @@ public class GoogleDriveShardRetriever implements ShardRetriever {
      * @return A list of byte arrays representing the downloaded file shards.
      * @throws Exception If there is an error during the download process.
      */
-    public List<byte[]> downloadFilesFromDrive(List<FileInfo> fileInfos) throws Exception {
+    @Override
+    public List<byte[]> downloadFiles(List<FileInfo> fileInfos) throws Exception {
         String accessToken = getAccessToken();
         Drive driveService = getDriveService(accessToken);
 
@@ -133,6 +133,43 @@ public class GoogleDriveShardRetriever implements ShardRetriever {
         return downloadedFiles;
     }
 
+    /**
+     * Checks if a file exists in Google Drive by file name and storage location (folder).
+     *
+     * The method searches a specific folder (based on the storage location) for a file with the specified name.
+     *
+     * @param fileName The name of the file to search for.
+     * @param databaseIndex The index used to determine the folder (storage location).
+     * @return true if the file exists, false otherwise.
+     * @throws Exception If there is a security-related error or an I/O error during the search.
+     */
+    @Override
+    public boolean fileExists(String fileName, int databaseIndex) throws Exception {
+        String accessToken = getAccessToken();
+        Drive driveService = getDriveService(accessToken);
+
+        String folderId = STORAGE_LOCATIONS_AVAILABLE[databaseIndex];
+
+        Drive.Files.List request = driveService.files().list()
+                .setQ("'" + folderId + "' in parents and name = '" + fileName + "' and trashed = false")
+                .setFields("files(id, name)")
+                .setPageSize(1);  // Limit to 1 result since we just want to check if it exists
+
+        List<File> files = request.execute().getFiles();
+
+        return !files.isEmpty();  // Return true if any file is found
+    }
+
+    /**
+     * Downloads a file shard from a remote service (e.g., Google Drive) based on the provided file information.
+     * It verifies the integrity of the downloaded file by checking its hash against the stored hash.
+     *
+     * @param fileInfo The information about the file shard to be downloaded, including its name and shard index.
+     * @param accessToken The access token used for authenticating the request to the remote service.
+     * @param driveService The Drive service used to interact with the remote storage (e.g., Google Drive).
+     * @return A byte array containing the downloaded file shard, or null if the file doesn't exist or invalid hash.
+     * @throws Exception If an error occurs during file download or hash validation.
+     */
     private byte[] downloadFile(FileInfo fileInfo, String accessToken, Drive driveService) throws Exception {
         String fileId = getFileIdByName(accessToken, fileInfo.getFileName(), fileInfo.getShardIndex());
 
@@ -153,6 +190,14 @@ public class GoogleDriveShardRetriever implements ShardRetriever {
         }
     }
 
+    /**
+     * Validates the SHA-256 hash of the downloaded file data against the expected hash value.
+     *
+     * @param fileData The byte array containing the downloaded file data.
+     * @param expectedHash The expected SHA-256 hash of the file.
+     * @return true if the file's hash matches the expected hash, false otherwise.
+     * @throws NoSuchAlgorithmException If the SHA-256 hashing algorithm is not available.
+     */
     private boolean isFileHashValid(byte[] fileData, String expectedHash) throws NoSuchAlgorithmException {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] fileHashBytes = digest.digest(fileData);
@@ -192,43 +237,3 @@ public class GoogleDriveShardRetriever implements ShardRetriever {
         return files.get(0).getId();
     }
 }
-
-
-/*
-*     public List<byte[]> downloadFilesFromDrive(List<FileInfo> fileInfos) throws Exception {
-        String accessToken = getAccessToken();
-        Drive driveService = getDriveService(accessToken);
-
-        List<byte[]> downloadedFiles = new ArrayList<>();
-
-        for (FileInfo fileInfo : fileInfos) {
-            int shardIndex = fileInfo.getShardIndex();
-            String fileName = fileInfo.getFileName();
-            Long userId = fileInfo.getUserId();
-
-            String fileId = getFileIdByName(accessToken, fileName, shardIndex);
-
-            if (fileId == null) {
-                downloadedFiles.add(null);
-            } else {
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                HttpResponse fileResponse = driveService.files().get(fileId).executeMedia();
-                fileResponse.download(outputStream);
-
-                MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                byte[] downloadedHashBytes = digest.digest(outputStream.toByteArray());
-                String downloadedHash = HexFormat.of().formatHex(downloadedHashBytes);
-
-                if (!downloadedHash.equals(fileInfo.getFileSha256())) {
-                    downloadedFiles.add(null);
-                    continue;
-                }
-                downloadedFiles.add(outputStream.toByteArray());
-
-                outputStream.close();
-            }
-        }
-
-        return downloadedFiles;
-    }
-* */

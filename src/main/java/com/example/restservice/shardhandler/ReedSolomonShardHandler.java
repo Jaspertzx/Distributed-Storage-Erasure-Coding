@@ -21,12 +21,20 @@ import java.util.List;
 public class ReedSolomonShardHandler implements ShardHandler{
 
     private final int dataShards = 4;
+
     private final int parityShards = 2;
-    private static final int totalShards = 6;
+
+    private final int totalShards = 6;
+
+    private final ReedSolomon reedSolomon = ReedSolomon.create(dataShards, parityShards);
+
     private int shardSize;
+
 
     /**
      * Encodes the input file into data and parity shards.
+     *
+     * Formats the data into a 4 x n matrix for matrix multiplication with a 6 x 4 encoding matrix.
      *
      * @param inputFile The file to be encoded.
      * @return ArrayList of encoded shard files.
@@ -36,11 +44,6 @@ public class ReedSolomonShardHandler implements ShardHandler{
         calculateAndSetShardSize(inputFile.length());
         byte[] allBytes = fileToBytes(inputFile);
         int fileSize = allBytes.length;
-
-        int totalShardCapacity = shardSize * dataShards;
-        if (fileSize > totalShardCapacity) {
-            throw new IllegalArgumentException("File size exceeds shard capacity");
-        }
 
         byte[][] shards = new byte[totalShards][shardSize];
 
@@ -54,10 +57,7 @@ public class ReedSolomonShardHandler implements ShardHandler{
             byteOffset += bytesToCopy;
         }
 
-        ReedSolomon reedSolomon = ReedSolomon.create(dataShards, parityShards);
-
         reedSolomon.encodeParity(shards, 0, shardSize);
-
         File[] shardFiles = new File[totalShards];
 
         for (int i = 0; i < totalShards; i++) {
@@ -74,7 +74,6 @@ public class ReedSolomonShardHandler implements ShardHandler{
                 }
                 throw e;
             }
-            System.out.println("Shard " + i + " written to " + tempFile.getPath() + ", size: " + tempFile.length());
         }
         return shardFiles;
     }
@@ -112,26 +111,35 @@ public class ReedSolomonShardHandler implements ShardHandler{
             throw new IllegalStateException("Not enough shards to reconstruct the file");
         }
 
-        ReedSolomon reedSolomon = ReedSolomon.create(dataShards, parityShards);
-
         reedSolomon.decodeMissing(shards, shardPresent, 0, shardSize);
-
         Path tempFilePath = Files.createTempFile("decoded_", "_" + filename);
         File tempFile = tempFilePath.toFile();
         tempFile.deleteOnExit();
+
+        for (Integer missingShardIndex : missingShards) {
+            shardFiles.set(missingShardIndex, shards[missingShardIndex]);
+        }
 
         try (BufferedOutputStream fos = new BufferedOutputStream(new FileOutputStream(tempFile))) {
             for (int i = 0; i < dataShards; i++) {
                 fos.write(shards[i], 0, Math.min(shardSize, (int) originalFileLength - i * shardSize));
             }
         } catch (IOException e) {
-            tempFile.delete(); // Clean up if there's an issue during write
+            tempFile.delete();
             throw e;
         }
 
         return tempFile;
     }
 
+    /**
+     * Converts a given file to a byte array.
+     * This method reads the entire file into a byte array, ensuring that the file is fully read.
+     *
+     * @param file The file to be converted to a byte array.
+     * @return A byte array containing the contents of the file.
+     * @throws IOException If an I/O error occurs or the file cannot be fully read.
+     */
     public static byte[] fileToBytes(File file) throws IOException {
         byte[] originalBytes = new byte[(int) file.length()];
         try (FileInputStream fl = new FileInputStream(file)) {
@@ -143,6 +151,12 @@ public class ReedSolomonShardHandler implements ShardHandler{
         return originalBytes;
     }
 
+    /**
+     * Calculates and sets the size of each shard based on the file size and the number of data shards.
+     * The shard size is determined by dividing the file size by the number of data shards.
+     *
+     * @param fileSize The size of the file to be sharded.
+     */
     private void calculateAndSetShardSize(long fileSize) {
         shardSize = (int) Math.ceil((double) fileSize / dataShards);
     }

@@ -68,7 +68,6 @@ class UserControllerIntegrationTest {
                 .andReturn();
 
         String response = result.getResponse().getContentAsString();
-        System.out.println("Login response: " + response);
     }
 
     @Test

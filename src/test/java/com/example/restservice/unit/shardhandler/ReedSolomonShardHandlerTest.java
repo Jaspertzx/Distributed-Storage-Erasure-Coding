@@ -13,7 +13,7 @@ import java.util.List;
 
 public class ReedSolomonShardHandlerTest {
 
-    private ReedSolomonShardHandler shardHandler = new ReedSolomonShardHandler();
+    private final ReedSolomonShardHandler shardHandler = new ReedSolomonShardHandler();
     private File inputFile;
 
     @BeforeEach
